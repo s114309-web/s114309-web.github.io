@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>豆腐女孩-10分開始版</title>
+    <title>豆腐女孩-攝像機修正版</title>
     <style>
         body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(#87CEEB, #98FB98); font-family: Arial, sans-serif; }
         canvas { border: 2px solid #ddd; border-radius: 10px; cursor: pointer; }
@@ -14,15 +14,15 @@
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        const info = document.getElementById('info');
         
-        // 遊戲狀態 - 起始10分
+        // 遊戲狀態 - 起始10分 + 攝像機
         let gameState = {
             girl: { x: 200, y: 450, vy: 0, radius: 15, grounded: false, jumpCooldown: 0 },
             tofuStack: [{ x: 180, y: 500, w: 40, h: 40 }],
             currentTofu: { x: 170, y: 460, w: 40, h: 40, dir: 1, speed: 1.5 },
-            score: 10,  // 從10分開始
+            score: 10,
             gameOver: false,
+            cameraY: 0,  // 攝像機Y偏移
             keys: {}
         };
 
@@ -31,16 +31,18 @@
                 girl: { x: 200, y: 450, vy: 0, radius: 15, grounded: false, jumpCooldown: 0 },
                 tofuStack: [{ x: 180, y: 500, w: 40, h: 40 }],
                 currentTofu: { x: 170, y: 460, w: 40, h: 40, dir: 1, speed: 1.5 },
-                score: 10,  // 重啟也從10分開始
+                score: 10,
                 gameOver: false,
+                cameraY: 0,
                 keys: {}
             };
         }
 
-        function drawGirl() {
+        function drawGirl(cameraY) {
             const g = gameState.girl;
+            const screenY = g.y - cameraY;
             ctx.save();
-            ctx.translate(g.x, g.y);
+            ctx.translate(g.x, screenY);
             ctx.fillStyle = '#ff69b4';
             ctx.beginPath();
             ctx.arc(0, -g.radius, g.radius, 0, Math.PI * 2);
@@ -50,26 +52,32 @@
             ctx.restore();
         }
 
-        function drawTofu(stack) {
+        function drawTofu(stack, cameraY) {
             ctx.fillStyle = '#fffacd';
             ctx.shadowColor = '#ffeb99';
             ctx.shadowBlur = 5;
             stack.forEach((t) => {
-                ctx.fillRect(t.x, t.y, t.w, t.h);
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = '#f0e68c';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(t.x, t.y, t.w, t.h);
+                const screenY = t.y - cameraY;
+                if (screenY > -50 && screenY < 650) {  // 只畫在畫面內的豆腐
+                    ctx.fillRect(t.x, screenY, t.w, t.h);
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = '#f0e68c';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(t.x, screenY, t.w, t.h);
+                }
             });
         }
 
-        function drawCurrentTofu() {
+        function drawCurrentTofu(cameraY) {
             const t = gameState.currentTofu;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(t.x, t.y, t.w, t.h);
-            ctx.strokeStyle = '#ddd';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(t.x, t.y, t.w, t.h);
+            const screenY = t.y - cameraY;
+            if (screenY > -50 && screenY < 650) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(t.x, screenY, t.w, t.h);
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(t.x, screenY, t.w, t.h);
+            }
         }
 
         function update() {
@@ -83,6 +91,9 @@
                 g.y += g.vy;
             }
 
+            // 攝像機追蹤女孩（保持女孩在畫面中央）
+            gameState.cameraY = g.y - 300;
+
             gameState.currentTofu.x += gameState.currentTofu.dir * gameState.currentTofu.speed;
             if (gameState.currentTofu.x <= 140 || gameState.currentTofu.x >= 220) {
                 gameState.currentTofu.dir *= -1;
@@ -92,6 +103,7 @@
             const tofuCenter = topTofu.x + topTofu.w / 2;
             const girlCenter = g.x;
             const dist = Math.abs(girlCenter - tofuCenter);
+            
             if (g.y + g.radius >= topTofu.y && g.x > topTofu.x - 10 && g.x < topTofu.x + topTofu.w + 10) {
                 g.grounded = true;
                 g.y = topTofu.y - g.radius * 2;
@@ -104,6 +116,7 @@
                     gameState.score += 10;
                 }
 
+                // 生成新豆腐並提升 + 攝像機平滑跟隨
                 const newTofu = { x: gameState.currentTofu.x, y: topTofu.y - 40, w: 40, h: 40 };
                 gameState.tofuStack.push(newTofu);
                 gameState.currentTofu.y -= 40;
@@ -112,36 +125,47 @@
                 g.y -= 40;
             }
 
-            if (g.y > 620 || g.y > gameState.tofuStack[gameState.tofuStack.length - 1].y + 100) {
+            if (g.y > gameState.tofuStack[gameState.tofuStack.length - 1].y + 100) {
                 gameState.gameOver = true;
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, 400, 600);
+            const cameraY = gameState.cameraY;
             
+            // 動態背景漸層（跟隨攝像機）
             const grad = ctx.createLinearGradient(0, 0, 0, 600);
-            grad.addColorStop(0, '#87CEEB');
+            const skyStart = Math.max(0, -cameraY * 0.1);
+            grad.addColorStop(0, `hsl(195, 70%, ${70 + skyStart}%)`);
             grad.addColorStop(1, '#E0F6FF');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, 400, 600);
 
-            drawTofu(gameState.tofuStack);
-            drawCurrentTofu();
-            drawGirl();
+            drawTofu(gameState.tofuStack, cameraY);
+            drawCurrentTofu(cameraY);
+            drawGirl(cameraY);
 
+            // UI（固定在畫面上）
             ctx.fillStyle = '#000';
             ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'left';
             ctx.fillText(`分數: ${gameState.score}`, 20, 50);
-            ctx.font = '20px Arial';
+            
             if (gameState.gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0, 0, 400, 600);
                 ctx.fillStyle = '#ff4444';
                 ctx.font = 'bold 32px Arial';
-                ctx.fillText('遊戲結束!', 100, 280);
-                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText('遊戲結束!', 200, 280);
+                ctx.fillStyle = '#fff';
                 ctx.font = '20px Arial';
-                ctx.fillText(`最終分數: ${gameState.score}`, 120, 320);
-                ctx.fillText('按 R 重啟', 140, 350);
+                ctx.fillText(`最終分數: ${gameState.score}`, 200, 320);
+                ctx.fillText('按 R 重啟', 200, 350);
+                ctx.textAlign = 'left';
+            } else {
+                ctx.textAlign = 'left';
             }
         }
 
@@ -157,7 +181,6 @@
         canvas.addEventListener('click', jump);
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); jump(); });
         document.addEventListener('keydown', (e) => {
-            gameState.keys[e.key.toLowerCase()] = true;
             if (e.key.toLowerCase() === 'r' && gameState.gameOver) {
                 initGame();
             }
