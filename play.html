@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>豆腐女孩簡易版</title>
+    <style>body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f8ff; } canvas { border: 1px solid #ccc; }</style>
+</head>
+<body>
+    <canvas id="game" width="400" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        let girl = { x: 200, y: 500, vy: 0, onGround: true };
+        let tofuStack = [{ x: 180, y: 550, w: 40, h: 40 }];
+        let currentTofu = { x: 150, y: 510, w: 40, h: 40, dir: 1, speed: 1 };
+        let score = 0;
+        let gameOver = false;
+
+        function drawGirl() {
+            ctx.fillStyle = '#ff69b4'; ctx.fillRect(girl.x - 10, girl.y - 20, 20, 20); // 女孩頭身
+            ctx.fillStyle = '#ffc0cb'; ctx.fillRect(girl.x - 5, girl.y, 10, 20); // 身體
+        }
+
+        function drawTofu(stack) {
+            ctx.fillStyle = '#fffacd'; // 豆腐色
+            stack.forEach(t => ctx.fillRect(t.x, t.y, t.w, t.h));
+        }
+
+        function drawCurrentTofu() {
+            ctx.fillStyle = '#fff'; ctx.fillRect(currentTofu.x, currentTofu.y, currentTofu.w, currentTofu.h);
+            ctx.strokeStyle = '#ddd'; ctx.strokeRect(currentTofu.x, currentTofu.y, currentTofu.w, currentTofu.h);
+        }
+
+        function update() {
+            if (gameOver) return;
+            // 女孩物理
+            if (!girl.onGround) { girl.vy += 0.5; girl.y += girl.vy; }
+            // 當前豆腐移動
+            currentTofu.x += currentTofu.dir * currentTofu.speed;
+            if (currentTofu.x <= 140 || currentTofu.x >= 220) currentTofu.dir *= -1;
+            currentTofu.speed += 0.001;
+            // 檢查落地
+            const topTofu = tofuStack[tofuStack.length - 1];
+            if (girl.y + 20 >= topTofu.y && girl.x > topTofu.x - 15 && girl.x < topTofu.x + topTofu.w + 15) {
+                girl.onGround = true; girl.y = topTofu.y - 20; girl.vy = 0;
+                if (Math.abs(girl.x - (topTofu.x + topTofu.w/2)) < 10) score += 10; // 完美加分
+            }
+            // 新豆腐生成
+            if (girl.onGround) {
+                const newTofu = { x: currentTofu.x, y: topTofu.y - 40, w: 40, h: 40 };
+                tofuStack.push(newTofu); currentTofu.y -= 40; currentTofu.x = 150;
+                girl.y -= 40; score += 1;
+            }
+            // 碰撞失敗
+            if (girl.y > 600 || Math.abs(girl.x - currentTofu.x - 20) > 20) gameOver = true;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, 400, 600);
+            drawTofu(tofuStack); drawCurrentTofu(); drawGirl();
+            ctx.fillStyle = '#000'; ctx.font = '20px Arial'; ctx.fillText(`分數: ${score}`, 10, 30);
+            if (gameOver) ctx.fillText('遊戲結束! 重新載入頁面', 100, 300);
+        }
+
+        function jump() {
+            if (girl.onGround && !gameOver) { girl.vy = -12; girl.onGround = false; }
+        }
+
+        canvas.addEventListener('click', jump); canvas.addEventListener('touchstart', jump);
+        setInterval(() => { update(); draw(); }, 16);
+    </script>
+</body>
+</html>
