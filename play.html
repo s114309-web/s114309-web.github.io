@@ -1,72 +1,185 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>豆腐女孩簡易版</title>
-    <style>body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f8ff; } canvas { border: 1px solid #ccc; }</style>
+    <title>豆腐女孩修正版</title>
+    <style>
+        body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(#87CEEB, #98FB98); font-family: Arial, sans-serif; }
+        canvas { border: 2px solid #ddd; border-radius: 10px; cursor: pointer; }
+        #info { margin-top: 10px; color: #333; text-align: center; }
+    </style>
 </head>
 <body>
     <canvas id="game" width="400" height="600"></canvas>
+    <div id="info">點擊跳躍 | 完美落地得分翻倍 | 按R重啟</div>
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        let girl = { x: 200, y: 500, vy: 0, onGround: true };
-        let tofuStack = [{ x: 180, y: 550, w: 40, h: 40 }];
-        let currentTofu = { x: 150, y: 510, w: 40, h: 40, dir: 1, speed: 1 };
-        let score = 0;
-        let gameOver = false;
+        const info = document.getElementById('info');
+        
+        // 遊戲狀態
+        let gameState = {
+            girl: { x: 200, y: 450, vy: 0, radius: 15, grounded: false, jumpCooldown: 0 },
+            tofuStack: [{ x: 180, y: 500, w: 40, h: 40 }],
+            currentTofu: { x: 170, y: 460, w: 40, h: 40, dir: 1, speed: 1.5 },
+            score: 0,
+            gameOver: false,
+            keys: {}
+        };
+
+        function initGame() {
+            gameState = {
+                girl: { x: 200, y: 450, vy: 0, radius: 15, grounded: false, jumpCooldown: 0 },
+                tofuStack: [{ x: 180, y: 500, w: 40, h: 40 }],
+                currentTofu: { x: 170, y: 460, w: 40, h: 40, dir: 1, speed: 1.5 },
+                score: 0,
+                gameOver: false,
+                keys: {}
+            };
+        }
 
         function drawGirl() {
-            ctx.fillStyle = '#ff69b4'; ctx.fillRect(girl.x - 10, girl.y - 20, 20, 20); // 女孩頭身
-            ctx.fillStyle = '#ffc0cb'; ctx.fillRect(girl.x - 5, girl.y, 10, 20); // 身體
+            const g = gameState.girl;
+            ctx.save();
+            ctx.translate(g.x, g.y);
+            ctx.fillStyle = '#ff69b4';
+            ctx.beginPath();
+            ctx.arc(0, -g.radius, g.radius, 0, Math.PI * 2); // 頭
+            ctx.fill();
+            ctx.fillStyle = '#ffc0cb';
+            ctx.fillRect(-8, -g.radius + 5, 16, 20); // 身體
+            ctx.restore();
         }
 
         function drawTofu(stack) {
-            ctx.fillStyle = '#fffacd'; // 豆腐色
-            stack.forEach(t => ctx.fillRect(t.x, t.y, t.w, t.h));
+            ctx.fillStyle = '#fffacd';
+            ctx.shadowColor = '#ffeb99';
+            ctx.shadowBlur = 5;
+            stack.forEach((t, i) => {
+                ctx.fillRect(t.x, t.y, t.w, t.h);
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = '#f0e68c';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(t.x, t.y, t.w, t.h);
+            });
         }
 
         function drawCurrentTofu() {
-            ctx.fillStyle = '#fff'; ctx.fillRect(currentTofu.x, currentTofu.y, currentTofu.w, currentTofu.h);
-            ctx.strokeStyle = '#ddd'; ctx.strokeRect(currentTofu.x, currentTofu.y, currentTofu.w, currentTofu.h);
+            const t = gameState.currentTofu;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(t.x, t.y, t.w, t.h);
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(t.x, t.y, t.w, t.h);
         }
 
         function update() {
-            if (gameOver) return;
-            // 女孩物理
-            if (!girl.onGround) { girl.vy += 0.5; girl.y += girl.vy; }
-            // 當前豆腐移動
-            currentTofu.x += currentTofu.dir * currentTofu.speed;
-            if (currentTofu.x <= 140 || currentTofu.x >= 220) currentTofu.dir *= -1;
-            currentTofu.speed += 0.001;
-            // 檢查落地
-            const topTofu = tofuStack[tofuStack.length - 1];
-            if (girl.y + 20 >= topTofu.y && girl.x > topTofu.x - 15 && girl.x < topTofu.x + topTofu.w + 15) {
-                girl.onGround = true; girl.y = topTofu.y - 20; girl.vy = 0;
-                if (Math.abs(girl.x - (topTofu.x + topTofu.w/2)) < 10) score += 10; // 完美加分
+            if (gameState.gameOver) return;
+            const g = gameState.girl;
+            const topTofu = gameState.tofuStack[gameState.tofuStack.length - 1];
+
+            // 重力與跳躍冷卻
+            g.jumpCooldown = Math.max(0, g.jumpCooldown - 1);
+            if (!g.grounded) {
+                g.vy += 0.4;
+                g.y += g.vy;
             }
-            // 新豆腐生成
-            if (girl.onGround) {
-                const newTofu = { x: currentTofu.x, y: topTofu.y - 40, w: 40, h: 40 };
-                tofuStack.push(newTofu); currentTofu.y -= 40; currentTofu.x = 150;
-                girl.y -= 40; score += 1;
+
+            // 當前豆腐左右移動
+            gameState.currentTofu.x += gameState.currentTofu.dir * gameState.currentTofu.speed;
+            if (gameState.currentTofu.x <= 140 || gameState.currentTofu.x >= 220) {
+                gameState.currentTofu.dir *= -1;
             }
-            // 碰撞失敗
-            if (girl.y > 600 || Math.abs(girl.x - currentTofu.x - 20) > 20) gameOver = true;
+            gameState.currentTofu.speed = Math.min(3, gameState.currentTofu.speed + 0.002);
+
+            // 碰撞檢測：女孩是否落在頂層豆腐
+            const tofuCenter = topTofu.x + topTofu.w / 2;
+            const girlCenter = g.x;
+            const dist = Math.abs(girlCenter - tofuCenter);
+            if (g.y + g.radius >= topTofu.y && g.x > topTofu.x - 10 && g.x < topTofu.x + topTofu.w + 10) {
+                g.grounded = true;
+                g.y = topTofu.y - g.radius * 2;
+                g.vy = 0;
+                
+                // 完美落地檢查
+                if (dist < 8) {
+                    gameState.score += 20;
+                    // 完美動畫（輕微彈跳）
+                    g.y -= 5;
+                } else {
+                    gameState.score += 10;
+                }
+
+                // 生成新豆腐並提升
+                const newTofu = { x: gameState.currentTofu.x, y: topTofu.y - 40, w: 40, h: 40 };
+                gameState.tofuStack.push(newTofu);
+                gameState.currentTofu.y -= 40;
+                gameState.currentTofu.x = 170 + Math.random() * 60;
+                gameState.currentTofu.dir = Math.random() > 0.5 ? 1 : -1;
+                g.y -= 40;
+            }
+
+            // 遊戲結束條件
+            if (g.y > 620 || g.y > gameState.tofuStack[gameState.tofuStack.length - 1].y + 100) {
+                gameState.gameOver = true;
+            }
         }
 
         function draw() {
             ctx.clearRect(0, 0, 400, 600);
-            drawTofu(tofuStack); drawCurrentTofu(); drawGirl();
-            ctx.fillStyle = '#000'; ctx.font = '20px Arial'; ctx.fillText(`分數: ${score}`, 10, 30);
-            if (gameOver) ctx.fillText('遊戲結束! 重新載入頁面', 100, 300);
+            
+            // 背景漸層
+            const grad = ctx.createLinearGradient(0, 0, 0, 600);
+            grad.addColorStop(0, '#87CEEB');
+            grad.addColorStop(1, '#E0F6FF');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 400, 600);
+
+            drawTofu(gameState.tofuStack);
+            drawCurrentTofu();
+            drawGirl();
+
+            // 分數顯示
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText(`分數: ${gameState.score}`, 20, 50);
+            ctx.font = '20px Arial';
+            if (gameState.gameOver) {
+                ctx.fillStyle = '#ff4444';
+                ctx.font = 'bold 32px Arial';
+                ctx.fillText('遊戲結束!', 100, 280);
+                ctx.fillStyle = '#333';
+                ctx.font = '20px Arial';
+                ctx.fillText(`最終分數: ${gameState.score}`, 120, 320);
+                ctx.fillText('按 R 重啟', 140, 350);
+            }
         }
 
         function jump() {
-            if (girl.onGround && !gameOver) { girl.vy = -12; girl.onGround = false; }
+            const g = gameState.girl;
+            if (g.grounded && g.jumpCooldown === 0 && !gameState.gameOver) {
+                g.vy = -14;
+                g.grounded = false;
+                g.jumpCooldown = 10;
+            }
         }
 
-        canvas.addEventListener('click', jump); canvas.addEventListener('touchstart', jump);
-        setInterval(() => { update(); draw(); }, 16);
+        // 事件監聽
+        canvas.addEventListener('click', jump);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); jump(); });
+        document.addEventListener('keydown', (e) => {
+            gameState.keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'r' && gameState.gameOver) {
+                initGame();
+            }
+        });
+
+        // 遊戲循環
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
     </script>
 </body>
 </html>
