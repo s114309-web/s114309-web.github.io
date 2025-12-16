@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>豆腐女孩-攝像機修正版</title>
+    <title>豆腐女孩-中央固定版</title>
     <style>
         body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(#87CEEB, #98FB98); font-family: Arial, sans-serif; }
         canvas { border: 2px solid #ddd; border-radius: 10px; cursor: pointer; }
@@ -10,32 +10,48 @@
 </head>
 <body>
     <canvas id="game" width="400" height="600"></canvas>
-    <div id="info">點擊跳躍 | 完美落地得分翻倍 | 按R重啟 | 起始10分</div>
+    <div id="info">點擊跳躍 | 完美落地得分翻倍 | 按R重啟 | 起始10分 | 豆腐堆到中央自動跟隨</div>
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
         
-        // 遊戲狀態 - 起始10分 + 攝像機
+        // 遊戲狀態 - 豆腐從下方開始
         let gameState = {
-            girl: { x: 200, y: 450, vy: 0, radius: 15, grounded: false, jumpCooldown: 0 },
-            tofuStack: [{ x: 180, y: 500, w: 40, h: 40 }],
-            currentTofu: { x: 170, y: 460, w: 40, h: 40, dir: 1, speed: 1.5 },
+            girl: { x: 200, y: 520, vy: 0, radius: 15, grounded: true, jumpCooldown: 0 },
+            tofuStack: [{ x: 180, y: 550, w: 40, h: 40 }],  // 起始下方
+            currentTofu: { x: 170, y: 510, w: 40, h: 40, dir: 1, speed: 1.5 },
             score: 10,
             gameOver: false,
-            cameraY: 0,  // 攝像機Y偏移
+            cameraY: 0,
+            cameraActive: false,  // 攝像機是否啟動
             keys: {}
         };
 
         function initGame() {
             gameState = {
-                girl: { x: 200, y: 450, vy: 0, radius: 15, grounded: false, jumpCooldown: 0 },
-                tofuStack: [{ x: 180, y: 500, w: 40, h: 40 }],
-                currentTofu: { x: 170, y: 460, w: 40, h: 40, dir: 1, speed: 1.5 },
+                girl: { x: 200, y: 520, vy: 0, radius: 15, grounded: true, jumpCooldown: 0 },
+                tofuStack: [{ x: 180, y: 550, w: 40, h: 40 }],
+                currentTofu: { x: 170, y: 510, w: 40, h: 40, dir: 1, speed: 1.5 },
                 score: 10,
                 gameOver: false,
                 cameraY: 0,
+                cameraActive: false,
                 keys: {}
             };
+        }
+
+        function updateCamera() {
+            const topTofu = gameState.tofuStack[gameState.tofuStack.length - 1];
+            
+            // 當豆腐堆超過10層或topTofu.y < 300時啟動攝像機
+            if (!gameState.cameraActive && (gameState.tofuStack.length > 10 || topTofu.y < 300)) {
+                gameState.cameraActive = true;
+            }
+            
+            if (gameState.cameraActive) {
+                // 保持頂層豆腐在畫面中央 (Y=280)
+                gameState.cameraY = topTofu.y - 280;
+            }
         }
 
         function drawGirl(cameraY) {
@@ -58,7 +74,7 @@
             ctx.shadowBlur = 5;
             stack.forEach((t) => {
                 const screenY = t.y - cameraY;
-                if (screenY > -50 && screenY < 650) {  // 只畫在畫面內的豆腐
+                if (screenY > -50 && screenY < 650) {
                     ctx.fillRect(t.x, screenY, t.w, t.h);
                     ctx.shadowBlur = 0;
                     ctx.strokeStyle = '#f0e68c';
@@ -91,15 +107,17 @@
                 g.y += g.vy;
             }
 
-            // 攝像機追蹤女孩（保持女孩在畫面中央）
-            gameState.cameraY = g.y - 300;
+            // 更新攝像機
+            updateCamera();
 
+            // 當前豆腐移動
             gameState.currentTofu.x += gameState.currentTofu.dir * gameState.currentTofu.speed;
             if (gameState.currentTofu.x <= 140 || gameState.currentTofu.x >= 220) {
                 gameState.currentTofu.dir *= -1;
             }
             gameState.currentTofu.speed = Math.min(3, gameState.currentTofu.speed + 0.002);
 
+            // 碰撞檢測
             const tofuCenter = topTofu.x + topTofu.w / 2;
             const girlCenter = g.x;
             const dist = Math.abs(girlCenter - tofuCenter);
@@ -111,12 +129,13 @@
                 
                 if (dist < 8) {
                     gameState.score += 20;
-                    g.y -= 5;
+                    g.y -= 5; // 完美彈跳
+                    setTimeout(() => { g.y += 5; }, 100);
                 } else {
                     gameState.score += 10;
                 }
 
-                // 生成新豆腐並提升 + 攝像機平滑跟隨
+                // 生成新豆腐
                 const newTofu = { x: gameState.currentTofu.x, y: topTofu.y - 40, w: 40, h: 40 };
                 gameState.tofuStack.push(newTofu);
                 gameState.currentTofu.y -= 40;
@@ -125,6 +144,7 @@
                 g.y -= 40;
             }
 
+            // 遊戲結束
             if (g.y > gameState.tofuStack[gameState.tofuStack.length - 1].y + 100) {
                 gameState.gameOver = true;
             }
@@ -134,10 +154,9 @@
             ctx.clearRect(0, 0, 400, 600);
             const cameraY = gameState.cameraY;
             
-            // 動態背景漸層（跟隨攝像機）
+            // 背景
             const grad = ctx.createLinearGradient(0, 0, 0, 600);
-            const skyStart = Math.max(0, -cameraY * 0.1);
-            grad.addColorStop(0, `hsl(195, 70%, ${70 + skyStart}%)`);
+            grad.addColorStop(0, '#87CEEB');
             grad.addColorStop(1, '#E0F6FF');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, 400, 600);
@@ -146,11 +165,14 @@
             drawCurrentTofu(cameraY);
             drawGirl(cameraY);
 
-            // UI（固定在畫面上）
+            // UI
             ctx.fillStyle = '#000';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'left';
             ctx.fillText(`分數: ${gameState.score}`, 20, 50);
+            ctx.font = '18px Arial';
+            ctx.fillStyle = gameState.cameraActive ? '#4CAF50' : '#FF9800';
+            ctx.fillText(`攝像機: ${gameState.cameraActive ? '啟動' : '待機'}`, 20, 80);
             
             if (gameState.gameOver) {
                 ctx.fillStyle = 'rgba(0,0,0,0.7)';
