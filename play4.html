@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>豆腐女孩-長方形版（極限完美）</title>
+    <title>豆腐女孩-長方形版（一個豆腐完美）</title>
     <style>
         body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(#87CEEB, #98FB98); font-family: Arial, sans-serif; }
         canvas { border: 2px solid #ddd; border-radius: 10px; cursor: pointer; }
@@ -10,7 +10,7 @@
 </head>
 <body>
     <canvas id="game" width="400" height="600"></canvas>
-    <div id="info">點擊跳躍 | 必須完美中間(±半豆腐寬) | 否則重啟 | 按R重啟 | 長方形豆腐固定移動</div>
+    <div id="info">點擊跳躍 | 必須完美一個豆腐寬(±30px) | 否則重啟 | 按R重啟 | 長方形豆腐固定移動</div>
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
@@ -127,11 +127,11 @@
             }
             t.speed = Math.min(4, t.speed + 0.003);
 
-            // 🚨 極限碰撞檢測：只有完美中間才成功！
+            // 🚨 碰撞檢測：必須整個一個豆腐寬度內！
             const tofuCenter = topTofu.x + topTofu.w / 2;
             const girlCenter = g.x;
             const dist = Math.abs(girlCenter - tofuCenter);
-            const perfectRange = topTofu.w / 4;  // 半個豆腐寬度的1/2 = 15像素 (±15px)
+            const fullTofuRange = topTofu.w / 2;  // 一個豆腐寬度 = 60/2 = 30像素 (±30px)
             
             if (g.y + g.radius >= topTofu.y && 
                 g.x > topTofu.x - 15 && 
@@ -141,9 +141,9 @@
                 g.y = topTofu.y - g.radius * 2;
                 g.vy = 0;
                 
-                // 🔴 只有完美中間才繼續，否則遊戲結束！
-                if (dist <= perfectRange) {
-                    // 完美成功：得分+彈跳
+                // 🔴 只有在一個豆腐寬度範圍內才成功！
+                if (dist <= fullTofuRange) {
+                    // ✅ 成功：得分+彈跳+繼續遊戲
                     gameState.score += 20;
                     g.y -= 4;
                     setTimeout(() => { g.y += 4; }, 120);
@@ -156,7 +156,7 @@
                     if (t.x > 200) t.dir = -1; else t.dir = 1;
                     g.y -= 35;
                 } else {
-                    // ❌ 沒完美中間：直接遊戲結束！
+                    // ❌ 超出一個豆腐寬度：直接遊戲結束！
                     gameState.gameOver = true;
                 }
             }
