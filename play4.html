@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>豆腐女孩-長方形版（完美中間）</title>
+    <title>豆腐女孩-長方形版（極限完美）</title>
     <style>
         body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(#87CEEB, #98FB98); font-family: Arial, sans-serif; }
         canvas { border: 2px solid #ddd; border-radius: 10px; cursor: pointer; }
@@ -10,7 +10,7 @@
 </head>
 <body>
     <canvas id="game" width="400" height="600"></canvas>
-    <div id="info">點擊跳躍 | 完美中間(±半豆腐寬)得分翻倍 | 按R重啟 | 起始10分 | 長方形豆腐固定移動</div>
+    <div id="info">點擊跳躍 | 必須完美中間(±半豆腐寬) | 否則重啟 | 按R重啟 | 長方形豆腐固定移動</div>
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
@@ -127,35 +127,38 @@
             }
             t.speed = Math.min(4, t.speed + 0.003);
 
-            // 碰撞檢測（適應長方形）
+            // 🚨 極限碰撞檢測：只有完美中間才成功！
             const tofuCenter = topTofu.x + topTofu.w / 2;
             const girlCenter = g.x;
             const dist = Math.abs(girlCenter - tofuCenter);
-            const halfTofuWidth = topTofu.w / 2;  // 半個豆腐寬度 = 30像素
+            const perfectRange = topTofu.w / 4;  // 半個豆腐寬度的1/2 = 15像素 (±15px)
             
             if (g.y + g.radius >= topTofu.y && 
                 g.x > topTofu.x - 15 && 
                 g.x < topTofu.x + topTofu.w + 15) {
+                
                 g.grounded = true;
                 g.y = topTofu.y - g.radius * 2;
                 g.vy = 0;
                 
-                // 🔄 修改：只有誤差在半個豆腐寬度內才算完美（±15像素）
-                if (dist <= halfTofuWidth / 2) {  // 半個豆腐寬度的1/2 = 15像素
-                    gameState.score += 20;  // 完美得分翻倍
+                // 🔴 只有完美中間才繼續，否則遊戲結束！
+                if (dist <= perfectRange) {
+                    // 完美成功：得分+彈跳
+                    gameState.score += 20;
                     g.y -= 4;
                     setTimeout(() => { g.y += 4; }, 120);
-                } else {
-                    gameState.score += 10;  // 普通得分
-                }
 
-                // 生成新長方形豆腐
-                const newTofu = { x: t.x, y: topTofu.y - 35, w: 60, h: 30 };
-                gameState.tofuStack.push(newTofu);
-                t.y -= 35;
-                t.x = 170 + Math.random() * 50;
-                if (t.x > 200) t.dir = -1; else t.dir = 1;
-                g.y -= 35;
+                    // 生成新長方形豆腐
+                    const newTofu = { x: t.x, y: topTofu.y - 35, w: 60, h: 30 };
+                    gameState.tofuStack.push(newTofu);
+                    t.y -= 35;
+                    t.x = 170 + Math.random() * 50;
+                    if (t.x > 200) t.dir = -1; else t.dir = 1;
+                    g.y -= 35;
+                } else {
+                    // ❌ 沒完美中間：直接遊戲結束！
+                    gameState.gameOver = true;
+                }
             }
 
             if (g.y > gameState.tofuStack[gameState.tofuStack.length - 1].y + 80) {
